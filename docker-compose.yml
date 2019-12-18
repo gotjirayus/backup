@@ -1,0 +1,96 @@
+version: "2.1"
+services:
+  api:
+    depends_on:
+      pg:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: api.Dockerfile
+    restart: always
+    # ports:
+    #   - 80:8000
+    container_name: api
+    hostname: api
+    networks:
+      - race-pack
+    labels:
+      - traefik.web.frontend.rule=Host:api.bib.thai.run
+      - traefik.web.port=8000
+      - traefik.docker.network=race-pack
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: pass
+    volumes:
+      - ./db/mongo:/data/db
+    # ports:
+    #   - 27017:27017
+    container_name: mongo
+    hostname: mongo
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - race-pack
+  pg:
+    build:
+      context: .
+      dockerfile: pg.Dockerfile
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: racepack
+    volumes:
+      - ./db/postgres:/var/lib/postgresql/data
+    # ports:
+    #   - 5432:5432
+    container_name: pg
+    hostname: pg
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - race-pack
+  postgres-admin:
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@thai.run
+      PGADMIN_DEFAULT_PASSWORD: thairundev
+    image: dpage/pgadmin4
+    # ports:
+    #   - 8080:80
+    container_name: pg-admin
+    hostname: pg-admin
+    networks:
+      - race-pack
+  redis:
+    image: bitnami/redis:latest
+    restart: always
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    # ports:
+    #   - 6379:6379
+    container_name: redis
+    hostname: redis
+    healthcheck:
+      test: ["CMD", "redis-cli","ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5    
+    networks:
+      - race-pack
+
+networks:
+  race-pack:
+    external: true
